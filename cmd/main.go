@@ -39,10 +39,7 @@ func main() {
 		}
 		dir = d
 	}
-	downloader := m3u8_downloader.NewDownloader(m3u8Url, dir)
-	if name != "" {
-		downloader.SetName(name)
-	}
+	downloader := m3u8_downloader.NewDownloader(m3u8Url, dir, name)
 	if cookie != "" {
 		downloader.SetCookie(cookie)
 	}

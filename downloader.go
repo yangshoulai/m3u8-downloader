@@ -385,20 +385,21 @@ func showProgressBar(title string, progress float32, msg string) {
 	fmt.Print("\r" + s)
 }
 
-func NewDownloader(m3u8Url string, dir string) *Downloader {
+func NewDownloader(m3u8Url string, dir string, name string) *Downloader {
 	d := Downloader{
 		m3u8: &fileInfo{
 			name: m3u8FileName,
 			url:  m3u8Url,
 		},
-		dir:        filepath.Join(dir, defaultSubDir),
+		dir:        dir,
 		cookie:     "",
 		goroutines: runtime.NumCPU(),
 		force:      false,
 		ts:         make([]*fileInfo, 0),
 		host:       getHost(m3u8Url),
-		name:       defaultName,
+		name:       name,
 	}
+	d.dir = filepath.Join(d.dir, "."+d.name)
 	return &d
 }
 
