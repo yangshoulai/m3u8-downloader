@@ -42,11 +42,12 @@ type Downloader struct {
 	m3u8       *fileInfo   // m3u8下载地址
 	dir        string      // 保存目录
 	cookie     string      // 自定义下载 Cookie
+	referer    string      // 自定义下载 Referer
 	goroutines int         // 下载线程数
 	force      bool        // 是否强制重新下载
 	ts         []*fileInfo // TS文件列表
-	host       string
-	name       string
+	host       string      // 下载主地址
+	name       string      // 下面文件名称
 }
 
 func (d *Downloader) SetName(name string) {
@@ -58,6 +59,12 @@ func (d *Downloader) SetCookie(cookie string) {
 }
 func (d *Downloader) SetGoroutines(goroutines int) {
 	d.goroutines = goroutines
+}
+func (d *Downloader) SetForce(f bool) {
+	d.force = f
+}
+func (d *Downloader) SetReferer(r string) {
+	d.referer = r
 }
 
 func getHost(u string) string {
@@ -81,21 +88,25 @@ func (downloader *Downloader) NewHttpRequest(url string) (*http.Request, error) 
 	req.Header.Set("Accept", "*/*")
 	req.Header.Set("Accept-Encoding", "*")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5")
-	req.Header.Set("Referer", downloader.host)
+	if downloader.referer == "" {
+		req.Header.Set("Referer", downloader.host)
+	} else {
+		req.Header.Set("Referer", downloader.referer)
+	}
 	return req, nil
 }
 
 // Download 下载m3u8文件以及解析后的所有ts文件
 func (downloader *Downloader) Download() {
-	if !fileExists(downloader.dir) {
-		err := os.MkdirAll(downloader.dir, os.ModePerm)
+	if downloader.force {
+		// 删除下载文件夹内所有文件
+		err := os.RemoveAll(downloader.dir)
 		if err != nil {
 			panic(err)
 		}
 	}
-	if downloader.force {
-		// 删除下载文件夹内所有文件
-		err := os.RemoveAll(downloader.dir)
+	if !fileExists(downloader.dir) {
+		err := os.MkdirAll(downloader.dir, os.ModePerm)
 		if err != nil {
 			panic(err)
 		}

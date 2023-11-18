@@ -13,6 +13,8 @@ var (
 	oFlag = flag.String("o", "movie.mp4", "自定义文件名")
 	cFlag = flag.String("c", "", "自定义请求cookie")
 	dFlag = flag.String("d", "", "文件保存的绝对路径(默认为当前路径)")
+	fFLag = flag.Bool("f", false, "是否强制重新下载")
+	rFlag = flag.String("r", "", "自定义请求Referer")
 )
 
 func main() {
@@ -21,6 +23,8 @@ func main() {
 	name := *oFlag
 	cookie := *cFlag
 	dir := *dFlag
+	force := *fFLag
+	referer := *rFlag
 	args := flag.Args()
 	if len(args) == 0 || args[0] == "" {
 		fmt.Println("未指定m3u8文件下载地址")
@@ -45,5 +49,7 @@ func main() {
 	if goroutines > 0 {
 		downloader.SetGoroutines(goroutines)
 	}
+	downloader.SetForce(force)
+	downloader.SetReferer(referer)
 	downloader.Download()
 }
