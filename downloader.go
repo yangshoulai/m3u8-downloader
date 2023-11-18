@@ -100,9 +100,7 @@ func (downloader *Downloader) Download() {
 			panic(err)
 		}
 	}
-	defer func() {
-		_ = os.RemoveAll(downloader.dir)
-	}()
+
 	if fileExists(filepath.Join(downloader.dir, downloader.name)) {
 		err := os.Remove(filepath.Join(downloader.dir, downloader.name))
 		if err != nil {
@@ -113,12 +111,14 @@ func (downloader *Downloader) Download() {
 	// 下载m3u8文件
 	err := downloader.downloadM3u8File()
 	if err != nil {
+		_ = os.RemoveAll(downloader.dir)
 		showProgressBar("下载失败", 0, downloader.m3u8.url)
 		return
 	}
 	showProgressBar("正在下载", 0, downloader.m3u8.url)
 	media, err := downloader.parseM3u8File()
 	if err != nil {
+		_ = os.RemoveAll(downloader.dir)
 		showProgressBar("解析失败", 0, downloader.m3u8.url)
 		return
 	}
@@ -130,6 +130,7 @@ func (downloader *Downloader) Download() {
 	}
 	downloader.appendTsFile()
 	_ = os.Rename(filepath.Join(downloader.dir, downloader.name), filepath.Join(downloader.dir, "..", downloader.name))
+	_ = os.RemoveAll(downloader.dir)
 	showProgressBar("下载完成", 1, downloader.name)
 	fmt.Println()
 }
