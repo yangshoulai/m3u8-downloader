@@ -10,7 +10,6 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -25,7 +24,6 @@ import (
 const defaultProgressBarWidth = 30
 const defaultName = "movie.mp4"
 const m3u8FileName = "m3u8"
-const defaultSubDir = ".m3u8_downloader"
 
 var (
 	client = &http.Client{
@@ -68,11 +66,9 @@ func (d *Downloader) SetReferer(r string) {
 }
 
 func getHost(u string) string {
-	uri, err := url.Parse(u)
-	if err != nil {
-		return ""
-	}
-	return uri.Scheme + "://" + uri.Host
+	i := strings.LastIndex(u, "/")
+	h := string(u[:i])
+	return h
 }
 
 func (downloader *Downloader) NewHttpRequest(url string) (*http.Request, error) {
@@ -207,9 +203,17 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 
 	for i, segment := range media.Segments {
 		if segment != nil && segment.URI != "" {
+			url := segment.URI
+			if !strings.HasPrefix(url, "http") {
+				if strings.HasPrefix(url, "/") {
+					url = downloader.host + url
+				} else {
+					url = downloader.host + "/" + url
+				}
+			}
 			ts := fileInfo{
 				name: fmt.Sprintf("%05d.ts", i+1),
-				url:  segment.URI,
+				url:  url,
 			}
 			downloader.ts = append(downloader.ts, &ts)
 		}
