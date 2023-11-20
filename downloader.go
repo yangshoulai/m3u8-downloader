@@ -11,6 +11,7 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -29,6 +30,7 @@ var (
 	client = &http.Client{
 		Timeout: time.Millisecond * 60000,
 	}
+	terminalWidth = getTerminalWidth()
 )
 
 type fileInfo struct {
@@ -374,12 +376,34 @@ func fileExists(path string) bool {
 	return true
 }
 
+var lock sync.Mutex
+var lines int
+
+// ShowProgressBar 展示下载进度以及下载状态
 func ShowProgressBar(title string, progress float32, msg string) {
+	lock.Lock()
+	defer func() {
+		lock.Unlock()
+	}()
 	w := defaultProgressBarWidth
 	p := int(progress * float32(w))
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
 		title, strings.Repeat("=", p), w-p, "", progress*100, msg)
-	fmt.Print("\033[K")
+	fmt.Print("\r\033[K")
+	if lines > 1 {
+		for i := 1; i < lines; i++ {
+			fmt.Print("\033[1A\033[K")
+		}
+	}
+	if terminalWidth > 0 && len(msg) > terminalWidth {
+		lines = len(s) / terminalWidth
+		if len(s)%terminalWidth > 0 {
+			lines++
+		}
+	} else {
+		lines = 1
+	}
+
 	fmt.Print("\r" + s)
 }
 
@@ -423,4 +447,20 @@ func pkcs7UnPadding(origData []byte) []byte {
 	length := len(origData)
 	unpadding := int(origData[length-1])
 	return origData[:(length - unpadding)]
+}
+
+func getTerminalWidth() int {
+	cmd := exec.Command("stty", "size")
+	cmd.Stdin = os.Stdin
+	out, err := cmd.Output()
+	if err != nil {
+		return 0
+	}
+	var height int
+	var width int
+	_, err = fmt.Sscanf(string(out), "%d %d", &height, &width)
+	if err != nil {
+		return 0
+	}
+	return width
 }

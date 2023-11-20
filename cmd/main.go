@@ -27,8 +27,8 @@ func main() {
 	referer := *rFlag
 	args := flag.Args()
 	if len(args) == 0 || args[0] == "" {
-		fmt.Println("未指定m3u8文件下载地址")
-		fmt.Println("用法：./m3u8-downloader http(s)://host/xx/index.m3u8")
+		m3u8_downloader.ShowProgressBar("下载失败", 0, "未指定m3u8文件下载地址")
+		fmt.Println()
 		return
 	}
 	m3u8Url := args[0]

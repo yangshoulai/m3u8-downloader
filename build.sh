@@ -3,6 +3,11 @@
 mkdir "Releases"
 
 # 【darwin/amd64】
+echo "Start build darwin/arm64 ..."
+CGO_ENABLED=0 GOOS=darwin GOARCH=arm64 go build  -o ./Releases/m3u8-downloader-darwin-arm64 cmd/main.go
+
+
+# 【darwin/amd64】
 echo "Start build darwin/amd64 ..."
 CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build  -o ./Releases/m3u8-downloader-darwin-amd64 cmd/main.go
 
