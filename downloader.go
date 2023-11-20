@@ -415,7 +415,7 @@ func NewDownloader(m3u8Url string, dir string, name string) *Downloader {
 		},
 		dir:        dir,
 		cookie:     "",
-		goroutines: runtime.NumCPU(),
+		goroutines: 2 * runtime.NumCPU(),
 		force:      false,
 		ts:         make([]*fileInfo, 0),
 		host:       getHost(m3u8Url),
