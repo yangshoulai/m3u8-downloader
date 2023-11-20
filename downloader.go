@@ -118,20 +118,20 @@ func (downloader *Downloader) Download() {
 	}
 
 	// 下载m3u8文件
+	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
 	err := downloader.downloadM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
 		ShowProgressBar("下载失败", 0, downloader.m3u8.url)
 		return
 	}
-	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
+
 	media, err := downloader.parseM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
 		ShowProgressBar("解析失败", 0, downloader.m3u8.url)
 		return
 	}
-	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
 	downloaded := downloader.downloadTsFiles(media)
 	if downloaded != len(downloader.ts) {
 		ShowProgressBar("下载失败", float32(downloaded)/float32(len(downloader.ts)), "部分文件下载失败，可尝试重新执行进行断点续传")
