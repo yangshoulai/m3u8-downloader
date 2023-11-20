@@ -119,26 +119,26 @@ func (downloader *Downloader) Download() {
 	err := downloader.downloadM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		showProgressBar("下载失败", 0, downloader.m3u8.url)
+		ShowProgressBar("下载失败", 0, downloader.m3u8.url)
 		return
 	}
-	showProgressBar("正在下载", 0, downloader.m3u8.url)
+	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
 	media, err := downloader.parseM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		showProgressBar("解析失败", 0, downloader.m3u8.url)
+		ShowProgressBar("解析失败", 0, downloader.m3u8.url)
 		return
 	}
-	showProgressBar("正在下载", 0, downloader.m3u8.url)
+	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
 	downloaded := downloader.downloadTsFiles(media)
 	if downloaded != len(downloader.ts) {
-		showProgressBar("下载失败", float32(downloaded)/float32(len(downloader.ts)), "部分文件下载失败，可尝试重新执行进行断点续传")
+		ShowProgressBar("下载失败", float32(downloaded)/float32(len(downloader.ts)), "部分文件下载失败，可尝试重新执行进行断点续传")
 		return
 	}
 	downloader.appendTsFile()
 	_ = os.Rename(filepath.Join(downloader.dir, downloader.name), filepath.Join(downloader.dir, "..", downloader.name))
 	_ = os.RemoveAll(downloader.dir)
-	showProgressBar("下载完成", 1, downloader.name)
+	ShowProgressBar("下载完成", 1, downloader.name)
 	fmt.Println()
 }
 
@@ -195,10 +195,10 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 		iv = []byte(media.Key.IV)
 	}
 	if err != nil {
-		showProgressBar("下载失败", 0, u)
+		ShowProgressBar("下载失败", 0, u)
 		return 0
 	} else if len(key) > 0 {
-		showProgressBar("正在下载", 0, u)
+		ShowProgressBar("正在下载", 0, u)
 	}
 
 	for i, segment := range media.Segments {
@@ -238,7 +238,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 							err := downloader.downloadTsFile(f, key, iv)
 							if err == nil {
 								atomic.AddInt32(&downloaded, 1)
-								showProgressBar("正在下载", float32(downloaded)/float32(len(downloader.ts)), f.url)
+								ShowProgressBar("正在下载", float32(downloaded)/float32(len(downloader.ts)), f.url)
 								break
 							}
 						}
@@ -273,7 +273,7 @@ func (downloader *Downloader) appendTsFile() {
 		_ = f.Close()
 	}(f)
 	for _, file := range tsFiles {
-		showProgressBar("正在合并", 1, file)
+		ShowProgressBar("正在合并", 1, file)
 		b, err := os.ReadFile(file)
 		if err == nil {
 			_, _ = f.Write(b)
@@ -374,18 +374,12 @@ func fileExists(path string) bool {
 	return true
 }
 
-var preMsgLength = 0
-
-func showProgressBar(title string, progress float32, msg string) {
-	padding := preMsgLength - len(msg)
-	preMsgLength = len(msg)
-	if padding > 0 {
-		msg = msg + strings.Repeat(" ", padding)
-	}
+func ShowProgressBar(title string, progress float32, msg string) {
 	w := defaultProgressBarWidth
 	p := int(progress * float32(w))
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
 		title, strings.Repeat("=", p), w-p, "", progress*100, msg)
+	fmt.Print("\033[K")
 	fmt.Print("\r" + s)
 }
 
