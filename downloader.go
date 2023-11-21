@@ -76,7 +76,7 @@ func (downloader *Downloader) NewHttpRequest(url string) (*http.Request, error) 
 
 func (downloader *Downloader) printDownloaderDetails() {
 	f := "%-10s %s\n"
-	fmt.Printf(f, "M3U8 Url", downloader.m3u8.url)
+	fmt.Printf(f, "Url", downloader.m3u8.url)
 	fmt.Printf(f, "Cookie", downloader.cookie)
 	fmt.Printf(f, "Referer", downloader.referer)
 	fmt.Printf(f, "Goroutines", strconv.Itoa(downloader.goroutines))
@@ -89,7 +89,7 @@ func (downloader *Downloader) printDownloaderDetails() {
 func (downloader *Downloader) Download() {
 	downloader.printDownloaderDetails()
 	if downloader.m3u8.url == "" {
-		ShowProgressBar("下载失败", 0, "未提供M3U8文件下载地址")
+		ShowProgressBar("Failed", 0, "Url of m3u8 file not found")
 		return
 	}
 	downloader.host = getHost(downloader.m3u8.url)
@@ -98,14 +98,14 @@ func (downloader *Downloader) Download() {
 		// 删除下载文件夹内所有文件
 		err := os.RemoveAll(downloader.dir)
 		if err != nil {
-			ShowProgressBar("下载失败", 0, fmt.Sprintf("无法删除文件夹 %s", downloader.dir))
+			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not delete directory: %s", downloader.dir))
 			return
 		}
 	}
 	if !fileExists(downloader.dir) {
 		err := os.MkdirAll(downloader.dir, os.ModePerm)
 		if err != nil {
-			ShowProgressBar("下载失败", 0, fmt.Sprintf("无法创建文件夹 %s", downloader.dir))
+			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not create directory: %s", downloader.dir))
 			return
 		}
 	}
@@ -113,35 +113,35 @@ func (downloader *Downloader) Download() {
 	if fileExists(filepath.Join(downloader.dir, downloader.name)) {
 		err := os.Remove(filepath.Join(downloader.dir, downloader.name))
 		if err != nil {
-			ShowProgressBar("下载失败", 0, fmt.Sprintf("无法删除 %s", filepath.Join(downloader.dir, downloader.name)))
+			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not delete file: %s", filepath.Join(downloader.dir, downloader.name)))
 			return
 		}
 	}
 
 	// 下载m3u8文件
-	ShowProgressBar("正在下载", 0, downloader.name)
+	ShowProgressBar("Downloading", 0, downloader.name)
 	err := downloader.downloadM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		ShowProgressBar("下载失败", 0, err.Error())
+		ShowProgressBar("Failed", 0, err.Error())
 		return
 	}
 
 	media, err := downloader.parseM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		ShowProgressBar("解析失败", 0, err.Error())
+		ShowProgressBar("Failed", 0, err.Error())
 		return
 	}
 	downloaded := downloader.downloadTsFiles(media)
 	if downloaded != len(downloader.ts) {
-		ShowProgressBar("下载失败", float32(downloaded)/float32(len(downloader.ts)), "部分文件下载失败，可尝试重新执行进行断点续传")
+		ShowProgressBar("Failed", float32(downloaded)/float32(len(downloader.ts)), "Some files failed to download, please try again")
 		return
 	}
 	downloader.appendTsFile()
 	_ = os.Rename(filepath.Join(downloader.dir, downloader.name), filepath.Join(downloader.dir, "..", downloader.name))
 	_ = os.RemoveAll(downloader.dir)
-	ShowProgressBar("下载完成", 1, downloader.name)
+	ShowProgressBar("Completed", 1, downloader.name)
 	fmt.Println()
 }
 
@@ -160,18 +160,18 @@ func (downloader *Downloader) downloadM3u8File() error {
 			_ = resp.Body.Close()
 		}()
 		if resp.StatusCode != 200 {
-			return errors.New(fmt.Sprintf("状态码 = %d, %s", resp.StatusCode, downloader.m3u8.url))
+			return errors.New(fmt.Sprintf("Bad http status = %d, %s", resp.StatusCode, downloader.m3u8.url))
 		}
 		f, err := os.Create(filePath)
 		if err != nil {
-			return errors.New(fmt.Sprintf("无法创建文件 %s", filePath))
+			return errors.New(fmt.Sprintf("Can not create file: %s", filePath))
 		}
 		defer func(f *os.File) {
 			_ = f.Close()
 		}(f)
 		_, err = io.Copy(f, resp.Body)
 		if err != nil {
-			return errors.New(fmt.Sprintf("无法写入文件 %s", filePath))
+			return errors.New(fmt.Sprintf("Can not write file: %s", filePath))
 		}
 	}
 	return nil
@@ -181,16 +181,16 @@ func (downloader *Downloader) parseM3u8File() (*m3u8.MediaPlaylist, error) {
 	m3u8File := filepath.Join(downloader.dir, downloader.m3u8.name)
 	f, err := os.Open(m3u8File)
 	if err != nil {
-		return nil, errors.New("无法打开M3U8文件")
+		return nil, errors.New(fmt.Sprintf("Can not open file: %s", m3u8File))
 	}
 	p, t, err := m3u8.DecodeFrom(bufio.NewReader(f), false)
 	if err != nil {
-		return nil, errors.New("无法解析M3U8文件")
+		return nil, errors.New(fmt.Sprintf("Can not parse file: %s", m3u8File))
 	}
 	if t == m3u8.MEDIA {
 		return p.(*m3u8.MediaPlaylist), nil
 	} else {
-		return nil, errors.New("无法解析M3U8文件")
+		return nil, errors.New(fmt.Sprintf("Can not parse file: %s", m3u8File))
 	}
 }
 
@@ -201,7 +201,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 		iv = []byte(media.Key.IV)
 	}
 	if err != nil {
-		ShowProgressBar("下载失败", 0, err.Error())
+		ShowProgressBar("Failed", 0, err.Error())
 		return 0
 	}
 
@@ -236,13 +236,11 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 				select {
 				case f := <-ch:
 					if f != nil {
-						retries := 5
-						for i := retries; i > 0; i-- {
-							retries--
+						ShowProgressBar("Downloading", float32(downloaded)/float32(len(downloader.ts)), f.name)
+						for i := 5; i > 0; i-- {
 							err := downloader.downloadTsFile(f, key, iv)
 							if err == nil {
 								atomic.AddInt32(&downloaded, 1)
-								ShowProgressBar("正在下载", float32(downloaded)/float32(len(downloader.ts)), f.name)
 								break
 							}
 						}
@@ -269,14 +267,14 @@ func (downloader *Downloader) appendTsFile() {
 	sort.Strings(tsFiles)
 	f, err := os.OpenFile(filepath.Join(downloader.dir, downloader.name), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
-		ShowProgressBar("合并失败", 1, fmt.Sprintf("无法打开文件 %s", filepath.Join(downloader.dir, downloader.name)))
+		ShowProgressBar("Failed", 1, fmt.Sprintf("Can not open file: %s", filepath.Join(downloader.dir, downloader.name)))
 		return
 	}
 	defer func(f *os.File) {
 		_ = f.Close()
 	}(f)
 	for _, file := range tsFiles {
-		ShowProgressBar("正在合并", 1, file)
+		ShowProgressBar("Merging", 1, file)
 		b, err := os.ReadFile(filepath.Join(downloader.dir, file))
 		if err == nil {
 			_, _ = f.Write(b)
@@ -363,7 +361,7 @@ func (downloader *Downloader) downloadKey(key *m3u8.Key) ([]byte, string, error)
 		_ = resp.Body.Close()
 	}()
 	if resp.StatusCode != 200 {
-		return nil, u, errors.New(fmt.Sprintf("无法下载密钥 %s", u))
+		return nil, u, errors.New(fmt.Sprintf("Can not download key: %s", u))
 	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -386,7 +384,7 @@ func ShowProgressBar(title string, progress float32, msg string) {
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
 		title, strings.Repeat("=", p), w-p, "", progress*100, msg)
 	fmt.Print("\r\033[K")
-	fmt.Print(s)
+	fmt.Print("\r" + s)
 }
 
 func NewDownloader(m3u8Url string, dir string, name string, cookie string, referer string, goroutines int, force bool) *Downloader {
