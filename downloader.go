@@ -11,7 +11,6 @@ import (
 	"io/fs"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -30,7 +29,6 @@ var (
 	client = &http.Client{
 		Timeout: time.Millisecond * 60000,
 	}
-	terminalWidth = getTerminalWidth()
 )
 
 type fileInfo struct {
@@ -118,18 +116,18 @@ func (downloader *Downloader) Download() {
 	}
 
 	// 下载m3u8文件
-	ShowProgressBar("正在下载", 0, downloader.m3u8.url)
+	ShowProgressBar("正在下载", 0, downloader.name)
 	err := downloader.downloadM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		ShowProgressBar("下载失败", 0, downloader.m3u8.url)
+		ShowProgressBar("下载失败", 0, err.Error())
 		return
 	}
 
 	media, err := downloader.parseM3u8File()
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
-		ShowProgressBar("解析失败", 0, downloader.m3u8.url)
+		ShowProgressBar("解析失败", 0, err.Error())
 		return
 	}
 	downloaded := downloader.downloadTsFiles(media)
@@ -191,16 +189,14 @@ func (downloader *Downloader) parseM3u8File() (*m3u8.MediaPlaylist, error) {
 }
 
 func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
-	key, u, err := downloader.downloadKey(media.Key)
+	key, _, err := downloader.downloadKey(media.Key)
 	var iv []byte = nil
 	if media.Key != nil {
 		iv = []byte(media.Key.IV)
 	}
 	if err != nil {
-		ShowProgressBar("下载失败", 0, u)
+		ShowProgressBar("下载失败", 0, err.Error())
 		return 0
-	} else if len(key) > 0 {
-		ShowProgressBar("正在下载", 0, u)
 	}
 
 	for i, segment := range media.Segments {
@@ -240,7 +236,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 							err := downloader.downloadTsFile(f, key, iv)
 							if err == nil {
 								atomic.AddInt32(&downloaded, 1)
-								ShowProgressBar("正在下载", float32(downloaded)/float32(len(downloader.ts)), f.url)
+								ShowProgressBar("正在下载", float32(downloaded)/float32(len(downloader.ts)), downloader.name)
 								break
 							}
 						}
@@ -297,7 +293,7 @@ func (downloader *Downloader) downloadTsFile(ts *fileInfo, key []byte, iv []byte
 		return err
 	}
 	if resp.StatusCode != 200 {
-		return errors.New(fmt.Sprintf("%s 下载失败", ts.url))
+		return errors.New(fmt.Sprintf("%s", ts.url))
 	}
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -308,12 +304,12 @@ func (downloader *Downloader) downloadTsFile(ts *fileInfo, key []byte, iv []byte
 		return err
 	}
 	if len(content) == 0 || len(content) != contentLength {
-		return errors.New(fmt.Sprintf("%s 下载失败", ts.url))
+		return errors.New(fmt.Sprintf("%s", ts.url))
 	}
 	if key != nil {
 		c, err := aesDecrypt(content, key, []byte(iv))
 		if err != nil {
-			return errors.New(fmt.Sprintf("%s 下载失败", ts.url))
+			return errors.New(fmt.Sprintf("%s", ts.url))
 		}
 		content = c
 	}
@@ -359,7 +355,7 @@ func (downloader *Downloader) downloadKey(key *m3u8.Key) ([]byte, string, error)
 		return nil, u, err
 	}
 	if resp.StatusCode != 200 {
-		return nil, u, errors.New(fmt.Sprintf("%s 下载失败", u))
+		return nil, u, errors.New(fmt.Sprintf("%s", u))
 	}
 	b, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -376,35 +372,13 @@ func fileExists(path string) bool {
 	return true
 }
 
-var lock sync.Mutex
-var lines int
-
-// ShowProgressBar 展示下载进度以及下载状态
 func ShowProgressBar(title string, progress float32, msg string) {
-	lock.Lock()
-	defer func() {
-		lock.Unlock()
-	}()
 	w := defaultProgressBarWidth
 	p := int(progress * float32(w))
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
 		title, strings.Repeat("=", p), w-p, "", progress*100, msg)
 	fmt.Print("\r\033[K")
-	if lines > 1 {
-		for i := 1; i < lines; i++ {
-			fmt.Print("\033[1A\033[K")
-		}
-	}
-	if terminalWidth > 0 && len(msg) > terminalWidth {
-		lines = len(s) / terminalWidth
-		if len(s)%terminalWidth > 0 {
-			lines++
-		}
-	} else {
-		lines = 1
-	}
-
-	fmt.Print("\r" + s)
+	fmt.Print(s)
 }
 
 func NewDownloader(m3u8Url string, dir string, name string) *Downloader {
@@ -447,20 +421,4 @@ func pkcs7UnPadding(origData []byte) []byte {
 	length := len(origData)
 	unpadding := int(origData[length-1])
 	return origData[:(length - unpadding)]
-}
-
-func getTerminalWidth() int {
-	cmd := exec.Command("stty", "size")
-	cmd.Stdin = os.Stdin
-	out, err := cmd.Output()
-	if err != nil {
-		return 0
-	}
-	var height int
-	var width int
-	_, err = fmt.Sscanf(string(out), "%d %d", &height, &width)
-	if err != nil {
-		return 0
-	}
-	return width
 }
