@@ -92,6 +92,7 @@ func (downloader *Downloader) Download() {
 		ShowProgressBar("下载失败", 0, "未提供M3U8文件下载地址")
 		return
 	}
+	downloader.host = getHost(downloader.m3u8.url)
 
 	if downloader.force {
 		// 删除下载文件夹内所有文件
@@ -402,7 +403,7 @@ func NewDownloader(m3u8Url string, dir string, name string, cookie string, refer
 		goroutines: goroutines,
 		force:      force,
 		ts:         make([]*fileInfo, 0),
-		host:       getHost(m3u8Url),
+		host:       m3u8Url,
 		name:       name,
 		referer:    referer,
 	}
