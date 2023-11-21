@@ -2,9 +2,9 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	m3u8_downloader "m3u8-downloader"
 	"os"
+	"runtime"
 )
 
 var (
@@ -26,12 +26,10 @@ func main() {
 	force := *fFLag
 	referer := *rFlag
 	args := flag.Args()
-	if len(args) == 0 || args[0] == "" {
-		m3u8_downloader.ShowProgressBar("下载失败", 0, "未指定m3u8文件下载地址")
-		fmt.Println()
-		return
+	m3u8Url := ""
+	if len(args) > 0 {
+		m3u8Url = args[0]
 	}
-	m3u8Url := args[0]
 	if dir == "" {
 		d, err := os.Getwd()
 		if err != nil {
@@ -39,14 +37,9 @@ func main() {
 		}
 		dir = d
 	}
-	downloader := m3u8_downloader.NewDownloader(m3u8Url, dir, name)
-	if cookie != "" {
-		downloader.SetCookie(cookie)
+	if goroutines <= 0 {
+		goroutines = 2 * runtime.NumCPU()
 	}
-	if goroutines > 0 {
-		downloader.SetGoroutines(goroutines)
-	}
-	downloader.SetForce(force)
-	downloader.SetReferer(referer)
+	downloader := m3u8_downloader.NewDownloader(m3u8Url, dir, name, cookie, referer, goroutines, force)
 	downloader.Download()
 }
