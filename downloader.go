@@ -33,6 +33,8 @@ var (
 type fileInfo struct {
 	name string
 	url  string
+	key  []byte
+	iv   []byte
 }
 
 type Downloader struct {
@@ -139,7 +141,15 @@ func (downloader *Downloader) Download() {
 		fmt.Println()
 		return
 	}
-	downloaded := downloader.downloadTsFiles(media)
+
+	downloaded, err := downloader.downloadTsFiles(media)
+
+	if err != nil {
+		ShowProgressBar("Failed", 0, err.Error())
+		fmt.Println()
+		return
+	}
+
 	if downloaded != len(downloader.ts) {
 		ShowProgressBar("Failed", float32(downloaded)/float32(len(downloader.ts)), "Some files failed to download, please try again")
 		fmt.Println()
@@ -201,16 +211,9 @@ func (downloader *Downloader) parseM3u8File() (*m3u8.MediaPlaylist, error) {
 	}
 }
 
-func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
-	key, _, err := downloader.downloadKey(media.Key)
+func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) (int, error) {
+	var key []byte = nil
 	var iv []byte = nil
-	if media.Key != nil {
-		iv = []byte(media.Key.IV)
-	}
-	if err != nil {
-		ShowProgressBar("Failed", 0, err.Error())
-		return 0
-	}
 
 	for i, segment := range media.Segments {
 		if segment != nil && segment.URI != "" {
@@ -222,9 +225,19 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 					url = downloader.host + "/" + url
 				}
 			}
+			if segment.Key != nil {
+				iv = []byte(segment.Key.IV)
+				var err error
+				key, _, err = downloader.downloadKey(segment.Key)
+				if err != nil {
+					return 0, errors.New("Failed download key: " + segment.Key.URI)
+				}
+			}
 			ts := fileInfo{
 				name: fmt.Sprintf("%05d.ts", i+1),
 				url:  url,
+				key:  key,
+				iv:   iv,
 			}
 			downloader.ts = append(downloader.ts, &ts)
 		}
@@ -245,7 +258,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 					if f != nil {
 						ShowProgressBar("Downloading", float32(downloaded)/float32(len(downloader.ts)), f.name)
 						for i := 5; i > 0; i-- {
-							err := downloader.downloadTsFile(f, key, iv)
+							err := downloader.downloadTsFile(f)
 							if err == nil {
 								atomic.AddInt32(&downloaded, 1)
 								break
@@ -260,7 +273,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) int {
 	wg.Wait()
 	close(ch)
 
-	return int(downloaded)
+	return int(downloaded), nil
 }
 
 func (downloader *Downloader) appendTsFile() {
@@ -290,7 +303,7 @@ func (downloader *Downloader) appendTsFile() {
 	}
 }
 
-func (downloader *Downloader) downloadTsFile(ts *fileInfo, key []byte, iv []byte) error {
+func (downloader *Downloader) downloadTsFile(ts *fileInfo) error {
 	filePath := downloader.dir + "/" + ts.name
 	if fileExists(filePath) {
 		return nil
@@ -317,8 +330,8 @@ func (downloader *Downloader) downloadTsFile(ts *fileInfo, key []byte, iv []byte
 	if len(content) == 0 || len(content) != contentLength {
 		return errors.New(fmt.Sprintf("%s", ts.url))
 	}
-	if key != nil {
-		c, err := aesDecrypt(content, key, []byte(iv))
+	if ts.key != nil {
+		c, err := aesDecrypt(content, ts.key, ts.iv)
 		if err != nil {
 			return errors.New(fmt.Sprintf("%s", ts.url))
 		}
@@ -349,6 +362,10 @@ func (downloader *Downloader) downloadKey(key *m3u8.Key) ([]byte, string, error)
 	if key == nil || key.URI == "" {
 		return nil, "", nil
 	}
+	if strings.ToUpper(key.Method) != "AES-128" {
+		return nil, "", errors.New("Not supported encrypt method: " + key.Method)
+	}
+
 	u := key.URI
 	if !strings.HasPrefix(u, "http") {
 		if strings.HasPrefix(u, "/") {
