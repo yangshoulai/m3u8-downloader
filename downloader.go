@@ -90,6 +90,7 @@ func (downloader *Downloader) Download() {
 	downloader.printDownloaderDetails()
 	if downloader.m3u8.url == "" {
 		ShowProgressBar("Failed", 0, "Url of m3u8 file not found")
+		fmt.Println()
 		return
 	}
 	downloader.host = getHost(downloader.m3u8.url)
@@ -99,6 +100,7 @@ func (downloader *Downloader) Download() {
 		err := os.RemoveAll(downloader.dir)
 		if err != nil {
 			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not delete directory: %s", downloader.dir))
+			fmt.Println()
 			return
 		}
 	}
@@ -106,6 +108,7 @@ func (downloader *Downloader) Download() {
 		err := os.MkdirAll(downloader.dir, os.ModePerm)
 		if err != nil {
 			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not create directory: %s", downloader.dir))
+			fmt.Println()
 			return
 		}
 	}
@@ -114,6 +117,7 @@ func (downloader *Downloader) Download() {
 		err := os.Remove(filepath.Join(downloader.dir, downloader.name))
 		if err != nil {
 			ShowProgressBar("Failed", 0, fmt.Sprintf("Can not delete file: %s", filepath.Join(downloader.dir, downloader.name)))
+			fmt.Println()
 			return
 		}
 	}
@@ -124,6 +128,7 @@ func (downloader *Downloader) Download() {
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
 		ShowProgressBar("Failed", 0, err.Error())
+		fmt.Println()
 		return
 	}
 
@@ -131,11 +136,13 @@ func (downloader *Downloader) Download() {
 	if err != nil {
 		_ = os.RemoveAll(downloader.dir)
 		ShowProgressBar("Failed", 0, err.Error())
+		fmt.Println()
 		return
 	}
 	downloaded := downloader.downloadTsFiles(media)
 	if downloaded != len(downloader.ts) {
 		ShowProgressBar("Failed", float32(downloaded)/float32(len(downloader.ts)), "Some files failed to download, please try again")
+		fmt.Println()
 		return
 	}
 	downloader.appendTsFile()
@@ -268,6 +275,7 @@ func (downloader *Downloader) appendTsFile() {
 	f, err := os.OpenFile(filepath.Join(downloader.dir, downloader.name), os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		ShowProgressBar("Failed", 1, fmt.Sprintf("Can not open file: %s", filepath.Join(downloader.dir, downloader.name)))
+		fmt.Println()
 		return
 	}
 	defer func(f *os.File) {
@@ -383,8 +391,8 @@ func ShowProgressBar(title string, progress float32, msg string) {
 	p := int(progress * float32(w))
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
 		title, strings.Repeat("=", p), w-p, "", progress*100, msg)
-	fmt.Print("\r\033[K")
-	fmt.Print("\r" + s)
+	fmt.Print("\r\033[0K")
+	fmt.Print(s)
 }
 
 func NewDownloader(m3u8Url string, dir string, name string, cookie string, referer string, goroutines int, force bool) *Downloader {
