@@ -387,6 +387,13 @@ func fileExists(path string) bool {
 }
 
 func ShowProgressBar(title string, progress float32, msg string) {
+	fc := "\033[33m"
+	if title == "Failed" {
+		fc = "\033[31m"
+	} else if title == "Completed" {
+		fc = "\033[32m"
+	}
+	title = fmt.Sprintf("%v%s\033[39m", fc, title)
 	w := defaultProgressBarWidth
 	p := int(progress * float32(w))
 	s := fmt.Sprintf("[%s] %s%*s %6.2f%% %s",
