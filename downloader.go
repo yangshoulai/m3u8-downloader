@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -45,14 +46,20 @@ type Downloader struct {
 	goroutines int         // 下载线程数
 	force      bool        // 是否强制重新下载
 	ts         []*fileInfo // TS文件列表
-	host       string      // 下载主地址
 	name       string      // 下面文件名称
 }
 
-func getHost(u string) string {
-	i := strings.LastIndex(u, "/")
-	h := string(u[:i])
-	return h
+func (downloader *Downloader) getRequestUrl(sub string) string {
+	if strings.HasPrefix(sub, "/") {
+		u, _ := url.Parse(downloader.m3u8.url)
+		p := ""
+		if u.Port() != "" {
+			p = ":" + u.Port()
+		}
+		return u.Scheme + "://" + u.Host + p + sub
+	} else {
+		return string(downloader.m3u8.url[:strings.LastIndex(downloader.m3u8.url, "/")]) + "/" + sub
+	}
 }
 
 func (downloader *Downloader) NewHttpRequest(url string) (*http.Request, error) {
@@ -69,7 +76,7 @@ func (downloader *Downloader) NewHttpRequest(url string) (*http.Request, error) 
 	req.Header.Set("Accept-Encoding", "*")
 	req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9, en;q=0.8, de;q=0.7, *;q=0.5")
 	if downloader.referer == "" {
-		req.Header.Set("Referer", downloader.host)
+		req.Header.Set("Referer", downloader.m3u8.url[:strings.LastIndex(downloader.m3u8.url, "/")])
 	} else {
 		req.Header.Set("Referer", downloader.referer)
 	}
@@ -95,7 +102,6 @@ func (downloader *Downloader) Download() {
 		fmt.Println()
 		return
 	}
-	downloader.host = getHost(downloader.m3u8.url)
 
 	if downloader.force {
 		// 删除下载文件夹内所有文件
@@ -219,11 +225,7 @@ func (downloader *Downloader) downloadTsFiles(media *m3u8.MediaPlaylist) (int, e
 		if segment != nil && segment.URI != "" {
 			url := segment.URI
 			if !strings.HasPrefix(url, "http") {
-				if strings.HasPrefix(url, "/") {
-					url = downloader.host + url
-				} else {
-					url = downloader.host + "/" + url
-				}
+				url = downloader.getRequestUrl(url)
 			}
 			if segment.Key != nil {
 				iv = []byte(segment.Key.IV)
@@ -368,11 +370,7 @@ func (downloader *Downloader) downloadKey(key *m3u8.Key) ([]byte, string, error)
 
 	u := key.URI
 	if !strings.HasPrefix(u, "http") {
-		if strings.HasPrefix(u, "/") {
-			u = downloader.host + u
-		} else {
-			u = downloader.host + "/" + u
-		}
+		u = downloader.getRequestUrl(u)
 	}
 	req, err := downloader.NewHttpRequest(u)
 	if err != nil {
@@ -403,7 +401,11 @@ func fileExists(path string) bool {
 	return true
 }
 
+var lock = sync.Mutex{}
+
 func ShowProgressBar(title string, progress float32, msg string) {
+	lock.Lock()
+	defer lock.Unlock()
 	fc := "\033[33m"
 	if title == "Failed" {
 		fc = "\033[31m"
@@ -433,7 +435,6 @@ func NewDownloader(m3u8Url string, dir string, name string, cookie string, refer
 		goroutines: goroutines,
 		force:      force,
 		ts:         make([]*fileInfo, 0),
-		host:       m3u8Url,
 		name:       name,
 		referer:    referer,
 	}
@@ -448,7 +449,7 @@ func aesDecrypt(crypted, key []byte, ivs ...[]byte) ([]byte, error) {
 	}
 	blockSize := block.BlockSize()
 	var iv []byte
-	if len(ivs) == 0 {
+	if len(ivs) == 0 || len(ivs[0]) == 0 {
 		iv = key
 	} else {
 		iv = ivs[0]
