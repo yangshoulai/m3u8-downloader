@@ -90,7 +90,7 @@ func (downloader *Downloader) printDownloaderDetails() {
 	fmt.Printf(f, "Referer", downloader.referer)
 	fmt.Printf(f, "Goroutines", strconv.Itoa(downloader.goroutines))
 	fmt.Printf(f, "Force", strconv.FormatBool(downloader.force))
-	fmt.Printf(f, "Directory", downloader.dir[:strings.LastIndex(downloader.dir, "/")])
+	fmt.Printf(f, "Directory", downloader.dir[:strings.LastIndex(downloader.dir, string(os.PathSeparator))])
 	fmt.Printf(f, "File Name", downloader.name)
 }
 
